@@ -17,7 +17,7 @@ args = {
     'device':device,
     'learning_rate':5e-4,
     'batch_with_replacement':False,
-    'temperature':5
+    'temperature':5,
     'verbose':1                 
 }
 
