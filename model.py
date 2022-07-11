@@ -15,10 +15,16 @@ class Connect4Model(nn.Module):
         self.size = board_size[0]*board_size[1] # ex 6x7 board = 42 neurons
         self.action_size = action_size
 
-        self.hidden_layer_neurons = 16
+        self.hidden_layer_neurons = 1024
 
         self.fc1 = nn.Linear(in_features=self.size, out_features=self.hidden_layer_neurons)
         self.fc2 = nn.Linear(in_features=self.hidden_layer_neurons, out_features=self.hidden_layer_neurons)
+        self.fc3 = nn.Linear(in_features=self.hidden_layer_neurons, out_features=self.hidden_layer_neurons)
+        self.fc4 = nn.Linear(in_features=self.hidden_layer_neurons, out_features=self.hidden_layer_neurons)
+        self.fc5 = nn.Linear(in_features=self.hidden_layer_neurons, out_features=self.hidden_layer_neurons)
+        self.fc6 = nn.Linear(in_features=self.hidden_layer_neurons, out_features=self.hidden_layer_neurons)
+        self.fc7 = nn.Linear(in_features=self.hidden_layer_neurons, out_features=self.hidden_layer_neurons)
+        self.fc8 = nn.Linear(in_features=self.hidden_layer_neurons, out_features=self.hidden_layer_neurons)
 
         # Two heads on our network
         self.action_head = nn.Linear(in_features=self.hidden_layer_neurons, out_features=self.action_size)
@@ -31,6 +37,24 @@ class Connect4Model(nn.Module):
         x = F.relu(x)
 
         x = self.fc2(x)
+        x = F.relu(x)
+
+        x = self.fc3(x)
+        x = F.relu(x)
+
+        x = self.fc4(x)
+        x = F.relu(x)
+
+        x = self.fc5(x)
+        x = F.relu(x)
+
+        x = self.fc6(x)
+        x = F.relu(x)
+
+        x = self.fc7(x)
+        x = F.relu(x)
+
+        x = self.fc8(x)
         x = F.relu(x)
 
         action_logits = self.action_head(x)

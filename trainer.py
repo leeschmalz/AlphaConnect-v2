@@ -1,7 +1,8 @@
 import os
 import numpy as np
 from random import shuffle
-
+import time
+from tqdm import tqdm
 import torch
 import torch.optim as optim
 
@@ -26,6 +27,7 @@ class Trainer:
         while True:
             if self.args['verbose'] > 0:
                 print(state)
+                print('\n')
 
             # canonical board is the board from a single perspective,
             # the network makes decisions only from view of player 1
@@ -58,6 +60,13 @@ class Trainer:
 
             # if the game is over
             if reward is not None:
+                if self.args['verbose'] > 0:
+                    print(state)
+                    print('\n')
+                    print(f'Player {current_player*reward} wins.')
+                    print('\n')
+                    print('\n')
+                    
                 ret = [] 
                 for hist_state, hist_current_player, hist_action_probs in train_examples:
                     # [
@@ -85,14 +94,24 @@ class Trainer:
 
             train_examples = []
             
-            for eps in range(self.args['numEps']):
+            print('generating training examples...\n')
+            for eps in tqdm(range(self.args['numEps'])):
                 iteration_train_examples = self.execute_episode()
                 train_examples.extend(iteration_train_examples) 
 
             shuffle(train_examples)
             self.train(train_examples)
-            filename = self.args['checkpoint_path']
-            self.save_checkpoint(folder=".", filename=filename)
+            
+            filename = str(i) + "_" + self.args['checkpoint_path']
+            if i % self.args['save_freq'] == 0:
+                self.save_checkpoint(folder="./"+self.args['model_dir'], filename=filename)
+
+            random_benchmark = self.game.random_benchmark(self.model,test_games=self.args['benchmark_games'])
+            greedy_benchmark = self.game.greedy_benchmark(self.model,test_games=self.args['benchmark_games'])
+
+            print(f"Random benchmark: {random_benchmark}")
+            print(f"Greedy benchmark: {greedy_benchmark}")
+
 
     def train(self, examples):
         '''
@@ -105,7 +124,9 @@ class Trainer:
         pi_losses = [] # action prediction losses
         v_losses = [] # value losses
 
+        print(f"\n Training on {len(examples)} examples. \n")
         for epoch in range(self.args['epochs']):
+            print(f"\n Epoch {epoch} / {self.args['epochs']}\n")
             self.model.train()
 
             batch_idx = 0
@@ -125,10 +146,9 @@ class Trainer:
                 target_vs = torch.FloatTensor(np.array(vs).astype(np.float64))
 
                 # make contiguous copies if cuda
-                if self.args['device'] == 'cuda':
-                    boards = boards.contiguous().cuda() 
-                    target_pis = target_pis.contiguous().cuda() 
-                    target_vs = target_vs.contiguous().cuda()
+                boards = boards.contiguous().cuda() 
+                target_pis = target_pis.contiguous().cuda() 
+                target_vs = target_vs.contiguous().cuda()
 
                 # compute output
                 out_pi, out_v = self.model(boards)
@@ -149,9 +169,7 @@ class Trainer:
 
             print("Policy Loss", np.mean(pi_losses))
             print("Value Loss", np.mean(v_losses))
-            #print("Examples:")
-            #print(out_pi[0].detach())
-            #print(target_pis[0])
+            print('\n')
 
     def loss_pi(self, targets, outputs):
         # categorical cross-entropy on action predictions
@@ -168,6 +186,6 @@ class Trainer:
             os.mkdir(folder)
 
         filepath = os.path.join(folder, filename)
-        torch.save({
-            'state_dict': self.model.state_dict(),
-        }, filepath)
+        #torch.save({'state_dict': self.model.state_dict(),}, filepath)
+
+        torch.save(self.model.state_dict(), filepath)
