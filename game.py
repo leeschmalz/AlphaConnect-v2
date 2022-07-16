@@ -11,7 +11,7 @@ class Connect4Game:
     def __init__(self):
         self.columns = 7
         self.rows = 6
-
+        
     def get_init_board(self):
         b = np.zeros((self.rows,self.columns), dtype=np.int)
         return b
@@ -60,8 +60,6 @@ class Connect4Game:
         return True if player has 4 in a row, else False.
         '''
         # horizontal
-        winner = 0
-        done = False
         for i in range(6):
             for j in range(4):
                 if all(board[i,j:j+4] == player):
@@ -70,7 +68,7 @@ class Connect4Game:
         # vertical
         for j in range(7):
             for i in range(3):
-                if all(board[i:i+4,j] == 1):
+                if all(board[i:i+4,j] == player):
                     return True
         
         # diagonal top left to bottom right
@@ -104,7 +102,7 @@ class Connect4Game:
 
     def invert_board(self, board):
         return board*-1
-
+        
     def win_possible(self, board):
         # check if win is possible this looks at the board from player 1's perspective
         # horizontal
@@ -195,20 +193,37 @@ class Connect4Game:
         return action
 
     
-    def greedy_benchmark(self,model,test_games):
+    def greedy_benchmark(self,model,test_games,verbose=False):
         model_wins = 0
         model_losses = 0
 
-        for _ in range(test_games):
+        for i in range(test_games):
+            print_game = False
+            if i % 50 == 1 and verbose:
+                print_game = True
+
             # initialize the game
             board = self.get_init_board()
 
             while True:
                 # player 1 plays (model)
                 action_probs, _ = model.predict(board)
+
+                # if any children are invalid, mask action prob to 0
+                valid_moves = self.get_valid_moves(board)
+                action_probs = action_probs * valid_moves
+                action_probs /= np.sum(action_probs)
+
                 action = np.argmax(action_probs).item()
                 board, _ = self.get_next_state(board=board, player=1, action=action)
                 winner = self.get_reward_for_player(board, 1)
+
+                if print_game:
+                    print('model plays:', action)
+                    print(board)
+                    print('winner:', winner)
+                    print('\n')
+                
                 if winner is not None:
                     if winner == 1:
                         model_wins += 1
@@ -220,6 +235,12 @@ class Connect4Game:
                 opponent_action = self.get_greedy_action(self.invert_board(board))
                 board, _ = self.get_next_state(board=board, player=-1, action=opponent_action)
                 winner = self.get_reward_for_player(board, 1)
+                if print_game:
+                    print('opponent plays:', opponent_action)
+                    print(board)
+                    print('winner:', winner)
+                    print('\n')
+
                 if winner is not None:
                     if winner == 1:
                         model_wins += 1
@@ -240,7 +261,14 @@ class Connect4Game:
             while True:
                 # player 1 plays (model)
                 action_probs, _ = model.predict(board)
+
+                # if any children are invalid, mask action prob to 0
+                valid_moves = self.get_valid_moves(board)
+                action_probs = action_probs * valid_moves
+                action_probs /= np.sum(action_probs)
+
                 action = np.argmax(action_probs).item()
+
                 board, _ = self.get_next_state(board=board, player=1, action=action)
                 winner = self.get_reward_for_player(board, 1)
                 if winner is not None:
@@ -262,3 +290,17 @@ class Connect4Game:
                     break
         
         return model_wins / test_games
+
+    def board_to_one_hot(self,board):
+        board_one_hot = np.zeros((3, 6, 7))
+
+        for i in range(6):
+            for j in range(7):
+                if board[i][j] == 1:
+                    board_one_hot[0][i][j] = 1
+                elif board[i][j] == -1:
+                    board_one_hot[2][i][j] = 1
+                else:
+                    board_one_hot[1][i][j] = 1
+        
+        return board_one_hot
