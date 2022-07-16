@@ -23,7 +23,8 @@ args = {
     'verbose':0,
     'save_freq':1,
     'benchmark_games':100,
-    'debug_mode':False
+    'debug_mode':False,
+    'parallelize':True
 }
 
 if args['debug_mode']:

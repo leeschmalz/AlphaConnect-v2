@@ -119,9 +119,12 @@ class Trainer:
             train_examples = []
             
             print('generating training data...\n')
-            for eps in tqdm(range(self.args['numEps'])):
-                iteration_train_examples = self.execute_episode()
-                train_examples.extend(iteration_train_examples) 
+            if self.args['parallelize']:
+                train_examples = Parallel(n_jobs=4)(delayed(self.execute_episode)() for eps in range(self.args['numEps']))
+            else:
+                for eps in range(self.args['numEps']):
+                    iteration_train_examples = self.execute_episode()
+                    train_examples.extend(iteration_train_examples) 
 
             shuffle(train_examples)
             self.train(train_examples)
