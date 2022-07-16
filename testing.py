@@ -5,18 +5,22 @@ board = np.array([[0, 0, 0, 0, 0, 0, 0],
                   [0, 0, 0, 0, 0, 0, 0],
                   [0, 0, 0, 0, 0, 0, 0],
                   [0, 0, 0, 0, 0, 0, 0],
-                  [0, 0, 0, 0, 42, 0, 0],
-                  [0, 0, 0, 0, -1, 0, 0]])
+                  [0, 0, 0, 0, 1, 0, 0],
+                  [0, 0, -1, 1, -1, 0, 0]])
 
-batch_idx = 0
-batch_size = 3
-examples = [1,2,3,4,5,6,7,8,9,10,11,12]
-print(examples[len(examples)-1])
 
-while batch_idx < int(len(examples) / batch_size):
-    # randomly batch train examples
-    #print(list(range(batch_idx*batch_size,(batch_idx+1)*batch_size) ))
-    sample_ids = np.random.randint(len(examples), size=batch_size)
-    
-    #boards, pis, vs = list(zip(*[examples[i] for i in sample_ids]))
-    batch_idx+=1
+
+# convert each element of board to a one-hot vector
+def board_to_one_hot(board):
+    board_one_hot = np.zeros((3, 6, 7))
+
+    for i in range(6):
+        for j in range(7):
+            if board[i][j] == 1:
+                board_one_hot[0][i][j] = 1
+            elif board[i][j] == -1:
+                board_one_hot[2][i][j] = 1
+            else:
+                board_one_hot[1][i][j] = 1
+
+    return board_one_hot
