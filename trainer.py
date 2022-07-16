@@ -1,10 +1,12 @@
 import os
+from tabnanny import verbose
 import numpy as np
 from random import shuffle
 import time
 from tqdm import tqdm
 import torch
 import torch.optim as optim
+import torch.nn.functional as F
 
 from monte_carlo_tree_search import MCTS
 
@@ -25,42 +27,62 @@ class Trainer:
         state = self.game.get_init_board()
 
         while True:
-            if self.args['verbose'] > 0:
-                print(state)
-                print('\n')
-
             # canonical board is the board from a single perspective,
             # the network makes decisions only from view of player 1
 
             canonical_board = self.game.get_canonical_board(state, current_player)
 
-            # initialize a new tree with the current state of the game and model
-            self.mcts = MCTS(self.game, self.model, self.args)
+            # make action decision
+           
+            win_possible_player, winning_move = self.game.win_possible(canonical_board)
+            win_possible_opponent, blocking_move = self.game.win_possible(self.game.invert_board(canonical_board))
+            if win_possible_player: # if win is available, take it
+                action_probs = np.zeros(self.game.get_action_size())
+                action_probs[winning_move] = 1.0
+                action = winning_move
+            elif win_possible_opponent: # if opponent can win, block it
+                action_probs = np.zeros(self.game.get_action_size())
+                action_probs[blocking_move] = 1.0
+                action = blocking_move
+            else: # else, use MCTS to make a move
+                # initialize a new tree with the current state of the game and model
+                self.mcts = MCTS(self.game, self.model, self.args)
 
-            # simulate the decision of player 1 many times
-            # always player 1 since were using a canonical board
-            root = self.mcts.run(self.model, canonical_board, to_play=1)
+                # simulate the decision of player 1 many times
+                # always player 1 since were using a canonical board
+                root = self.mcts.run(self.model, canonical_board, to_play=1)
 
-            # use the visit counts of the children of the decision node to get probs
-            action_probs = [0 for _ in range(self.game.get_action_size())]
-            for k, v in root.children.items():
-                action_probs[k] = v.visit_count
+                # use the visit counts of the children of the decision node to get probs
+                action_probs = [0 for _ in range(self.game.get_action_size())]
+                for k, v in root.children.items():
+                    action_probs[k] = v.visit_count
 
-            # normalize so they sum to 1
-            action_probs = action_probs / np.sum(action_probs)
+                # normalize so they sum to 1
+                action_probs = action_probs / np.sum(action_probs)
+
+                action = root.select_action(temperature=self.args['temperature'])
 
             # add to training batch
             train_examples.append((canonical_board, current_player, action_probs))
 
+            if self.args['verbose'] > 0:
+                print('\n')
+                print('winning move: ', winning_move)
+                print('blocking move: ', blocking_move)
+                print('action_probs: ', action_probs)
+                print('action: ', action)
+                print(state)
+
             # select action based on simulations
-            action = root.select_action(temperature=self.args['temperature'])
             state, current_player = self.game.get_next_state(state, current_player, action)
             reward = self.game.get_reward_for_player(state, current_player)
             # reward is 1 if current_player wins, -1 if current_player lost
-
+                
+                
             # if the game is over
             if reward is not None:
                 if self.args['verbose'] > 0:
+                    print('\n')
                     print(state)
                     print('\n')
                     print(f'Player {current_player*reward} wins.')
@@ -81,20 +103,22 @@ class Trainer:
                     else:
                         hist_reward = reward
 
-                    hist_state = hist_state.flatten() # dense nn takes board as vector
+                    # one hot encode each position to channels first representation (3,6,7)
+                    hist_state = self.game.board_to_one_hot(hist_state)
 
                     ret.append((hist_state, hist_action_probs, hist_reward))
 
                 return ret
 
     def learn(self):
-        for i in range(1, self.args['numIters'] + 1):
-
-            print(f"{i}/{self.args['numIters']}")
+        iter = self.args['start_iter']
+        while True:
+            iter += 1
+            print(f"Iteration: {iter}")
 
             train_examples = []
             
-            print('generating training examples...\n')
+            print('generating training data...\n')
             for eps in tqdm(range(self.args['numEps'])):
                 iteration_train_examples = self.execute_episode()
                 train_examples.extend(iteration_train_examples) 
@@ -102,12 +126,12 @@ class Trainer:
             shuffle(train_examples)
             self.train(train_examples)
             
-            filename = str(i) + "_" + self.args['checkpoint_path']
-            if i % self.args['save_freq'] == 0:
+            filename = str(iter) + "_model.pth"
+            if iter % self.args['save_freq'] == 0:
                 self.save_checkpoint(folder="./"+self.args['model_dir'], filename=filename)
 
             random_benchmark = self.game.random_benchmark(self.model,test_games=self.args['benchmark_games'])
-            greedy_benchmark = self.game.greedy_benchmark(self.model,test_games=self.args['benchmark_games'])
+            greedy_benchmark = self.game.greedy_benchmark(self.model,test_games=self.args['benchmark_games'],verbose=True)
 
             print(f"Random benchmark: {random_benchmark}")
             print(f"Greedy benchmark: {greedy_benchmark}")
@@ -126,7 +150,7 @@ class Trainer:
 
         print(f"\n Training on {len(examples)} examples. \n")
         for epoch in range(self.args['epochs']):
-            print(f"\n Epoch {epoch} / {self.args['epochs']}\n")
+            print(f"\n Epoch {epoch+1} / {self.args['epochs']}\n")
             self.model.train()
 
             batch_idx = 0
@@ -173,7 +197,8 @@ class Trainer:
 
     def loss_pi(self, targets, outputs):
         # categorical cross-entropy on action predictions
-        loss = -(targets * torch.log(outputs)).sum(dim=1)
+        # relu + epsilon output to prevent log(0)
+        loss = -(targets * torch.log(F.relu(outputs)+1e-6)).sum(dim=1)
         return loss.mean()
 
     def loss_v(self, targets, outputs):
@@ -186,6 +211,5 @@ class Trainer:
             os.mkdir(folder)
 
         filepath = os.path.join(folder, filename)
-        #torch.save({'state_dict': self.model.state_dict(),}, filepath)
 
         torch.save(self.model.state_dict(), filepath)
