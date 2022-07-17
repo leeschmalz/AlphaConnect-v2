@@ -7,7 +7,8 @@ from tqdm import tqdm
 import torch
 import torch.optim as optim
 import torch.nn.functional as F
-
+import joblib
+from joblib import Parallel, delayed
 from monte_carlo_tree_search import MCTS
 
 class Trainer:
@@ -22,6 +23,7 @@ class Trainer:
         '''
         executes a single game of connect 4
         '''
+
         train_examples = []
         current_player = 1
         state = self.game.get_init_board()
@@ -120,12 +122,15 @@ class Trainer:
             
             print('generating training data...\n')
             if self.args['parallelize']:
-                train_examples = Parallel(n_jobs=4)(delayed(self.execute_episode)() for eps in range(self.args['numEps']))
+                num_cpus = 6
+                iteration_train_examples = Parallel(n_jobs=num_cpus,verbose=100)(delayed(self.execute_episode)() for eps in range(self.args['numEps']))
+                for ex in iteration_train_examples:
+                    train_examples.extend(ex)
             else:
-                for eps in range(self.args['numEps']):
+                for eps in tqdm(range(self.args['numEps'])):
                     iteration_train_examples = self.execute_episode()
                     train_examples.extend(iteration_train_examples) 
-
+            
             shuffle(train_examples)
             self.train(train_examples)
             
