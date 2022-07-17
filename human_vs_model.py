@@ -3,9 +3,18 @@ import pygame
 import sys
 import math
 import random
+from model import Connect4Model
+import torch
+from game import Connect4Game
+import time
+
+#model to play against
+model_dir = 'C:\\Users\\leesc\\Documents\\GitHub\\AlphaConnect-v2\\models_2022-07-14-22-52-07\\'
+model_name = '125_model.pth'
+device = torch.device('cuda')
 
 BLUE = (52, 186, 235)
-BLACK = (70, 71, 70)
+GREY = (70, 71, 70)
 WHITE = (255,255,255)
 ORANGE = (255,100,0)
 
@@ -55,7 +64,7 @@ def winning_move(board, piece):
 def draw_board(board):
     for c in range(COLUMN_COUNT):
         for r in range(ROW_COUNT):
-            pygame.draw.rect(screen, BLACK, (c*SQUARESIZE, r*SQUARESIZE+SQUARESIZE, SQUARESIZE, SQUARESIZE))
+            pygame.draw.rect(screen, GREY, (c*SQUARESIZE, r*SQUARESIZE+SQUARESIZE, SQUARESIZE, SQUARESIZE))
             pygame.draw.circle(screen, WHITE, (int(c*SQUARESIZE+SQUARESIZE/2), int(r*SQUARESIZE+SQUARESIZE+SQUARESIZE/2)), RADIUS)
 	
     for c in range(COLUMN_COUNT):
@@ -66,11 +75,16 @@ def draw_board(board):
                 pygame.draw.circle(screen, ORANGE, (int(c*SQUARESIZE+SQUARESIZE/2), height-int(r*SQUARESIZE+SQUARESIZE/2)), RADIUS)
     pygame.display.update()
 
+game = Connect4Game()
+board_size = game.get_board_size()
+action_size = game.get_action_size()
+
+model = Connect4Model(board_size, action_size, device, game)
+model.load_state_dict(torch.load(f'{model_dir}{model_name}'))
 
 board = create_board()
 game_over = False
-turn = 1
-
+turn = random.choice([-1,1])
 pygame.init()
 
 SQUARESIZE = 100
@@ -86,7 +100,7 @@ screen = pygame.display.set_mode(size)
 draw_board(board)
 pygame.display.update()
 
-myfont = pygame.font.SysFont("monospace", 75)
+myfont = pygame.font.SysFont("arial", 65)
 
 while not game_over:
     for event in pygame.event.get():
@@ -109,30 +123,37 @@ while not game_over:
             if turn == 1:
                 posx = event.pos[0]
                 col = int(math.floor(posx/SQUARESIZE))
-                print(col)
                 if is_valid_location(board, col):
                     row = get_next_open_row(board, col)
                     drop_piece(board, row, col, 1)
                     
                     if winning_move(board, 1):
-                        label = myfont.render("You win.", 1, BLUE)
+                        label = myfont.render("Blue wins.", 1, BLUE)
                         screen.blit(label, (40,10))
                         game_over = True
 
 
 			# # Ask for Player 2 Input
             else:
-                posx = event.pos[0]
                 # predict on this
                 print(np.flip(board, 0))
+
+                action_probs, _ = model.predict(game.invert_board(np.flip(board, 0)))
+
+                # if any children are invalid, mask action prob to 0
+                valid_moves = game.get_valid_moves(game.invert_board(np.flip(board, 0)))
+                action_probs = action_probs * valid_moves
+                action_probs /= np.sum(action_probs)
+
+                col = np.argmax(action_probs).item()
+                time.sleep(1)
                 print('\n')
-                col = random.choice([0,1,2,3,4,5,6])
                 if is_valid_location(board, col):
                     row = get_next_open_row(board, col)
                     drop_piece(board, row, col, -1)
                     
                     if winning_move(board, -1):
-                        label = myfont.render("You lose.", 1, ORANGE)
+                        label = myfont.render("Orange wins.", 1, ORANGE)
                         screen.blit(label, (40,10))
                         game_over = True
 

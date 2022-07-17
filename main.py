@@ -16,7 +16,7 @@ args = {
     'numEps': 100,                                   # Number of full games (episodes) to run during each iteration
     'epochs': 10,                                   # Number of epochs of training per iteration
     'model_dir':'models_2022-07-14-22-52-07', # 'models_' + time.strftime("%Y-%m-%d-%H-%M-%S"), # 
-    'start_iter':68,
+    'start_iter':108,
     'learning_rate':5e-4,
     'batch_with_replacement':False,
     'temperature':1,
