@@ -10,13 +10,13 @@ import time
 
 #model to play against
 model_dir = 'C:\\Users\\leesc\\Documents\\GitHub\\AlphaConnect-v2\\models_2022-07-14-22-52-07\\'
-model_name = '125_model.pth'
+model_name = '202' + '_model.pth'
 device = torch.device('cuda')
 
 BLUE = (52, 186, 235)
 GREY = (70, 71, 70)
 WHITE = (255,255,255)
-ORANGE = (255,100,0)
+YELLOW = (230,230,20)
 
 ROW_COUNT = 6
 COLUMN_COUNT = 7
@@ -70,9 +70,9 @@ def draw_board(board):
     for c in range(COLUMN_COUNT):
         for r in range(ROW_COUNT):
             if board[r][c] == 1:
-                pygame.draw.circle(screen, BLUE, (int(c*SQUARESIZE+SQUARESIZE/2), height-int(r*SQUARESIZE+SQUARESIZE/2)), RADIUS)
+                pygame.draw.circle(screen, YELLOW, (int(c*SQUARESIZE+SQUARESIZE/2), height-int(r*SQUARESIZE+SQUARESIZE/2)), RADIUS)
             elif board[r][c] == -1:
-                pygame.draw.circle(screen, ORANGE, (int(c*SQUARESIZE+SQUARESIZE/2), height-int(r*SQUARESIZE+SQUARESIZE/2)), RADIUS)
+                pygame.draw.circle(screen, BLUE, (int(c*SQUARESIZE+SQUARESIZE/2), height-int(r*SQUARESIZE+SQUARESIZE/2)), RADIUS)
     pygame.display.update()
 
 game = Connect4Game()
@@ -111,9 +111,9 @@ while not game_over:
             pygame.draw.rect(screen, WHITE, (0,0, width, SQUARESIZE))
             posx = event.pos[0]
             if turn == 1:
-                pygame.draw.circle(screen, BLUE, (posx, int(SQUARESIZE/2)), RADIUS)
+                pygame.draw.circle(screen, YELLOW, (posx, int(SQUARESIZE/2)), RADIUS)
             else:
-                pygame.draw.circle(screen, ORANGE, (posx, int(SQUARESIZE/2)), RADIUS)
+                pygame.draw.circle(screen, BLUE, (posx, int(SQUARESIZE/2)), RADIUS)
         pygame.display.update()
         
         if event.type == pygame.MOUSEBUTTONDOWN or turn==-1:
@@ -128,9 +128,11 @@ while not game_over:
                     drop_piece(board, row, col, 1)
                     
                     if winning_move(board, 1):
-                        label = myfont.render("Blue wins.", 1, BLUE)
+                        label = myfont.render("You win.", 1, YELLOW)
                         screen.blit(label, (40,10))
                         game_over = True
+                        if not any(board.flatten() == 0):
+                            game_over = True
 
 
 			# # Ask for Player 2 Input
@@ -153,9 +155,11 @@ while not game_over:
                     drop_piece(board, row, col, -1)
                     
                     if winning_move(board, -1):
-                        label = myfont.render("Orange wins.", 1, ORANGE)
+                        label = myfont.render("You lose.", 1, BLUE)
                         screen.blit(label, (40,10))
                         game_over = True
+                        if not any(board.flatten() == 0):
+                            game_over = True
 
             draw_board(board)
 

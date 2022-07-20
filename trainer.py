@@ -38,11 +38,11 @@ class Trainer:
            
             win_possible_player, winning_move = self.game.win_possible(canonical_board)
             win_possible_opponent, blocking_move = self.game.win_possible(self.game.invert_board(canonical_board))
-            if win_possible_player: # if win is available, take it
+            if win_possible_player and self.args['force_win']: # if win is available, take it
                 action_probs = np.zeros(self.game.get_action_size())
                 action_probs[winning_move] = 1.0
                 action = winning_move
-            elif win_possible_opponent: # if opponent can win, block it
+            elif win_possible_opponent and self.args['force_block_win']: # if opponent can win, block it
                 action_probs = np.zeros(self.game.get_action_size())
                 action_probs[blocking_move] = 1.0
                 action = blocking_move
